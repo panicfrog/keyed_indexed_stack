@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:lazy_indexed_stack/lazy_indexed_stack.dart';
+import 'package:keyed_indexed_stack/keyed_indexed_stack.dart';
 
 enum AppTab { home, search, profile, settings, about }
 

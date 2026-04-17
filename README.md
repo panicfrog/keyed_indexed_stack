@@ -1,4 +1,4 @@
-# lazy_indexed_stack
+# keyed_indexed_stack
 
 A lazy-loading replacement for Flutter's `IndexedStack`.
 

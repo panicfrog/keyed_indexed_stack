@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:lazy_indexed_stack/lazy_indexed_stack.dart';
+import 'package:keyed_indexed_stack/keyed_indexed_stack.dart';
 
 enum Tab { home, search, profile, settings, about }
 

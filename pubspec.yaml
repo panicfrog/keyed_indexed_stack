@@ -1,11 +1,11 @@
-name: lazy_indexed_stack
-description: "A new Flutter package project."
-version: 0.0.1
-homepage:
+name: keyed_indexed_stack
+description: "A lazy-loading replacement for IndexedStack with generic keys, keep-alive, preheat, and lifecycle callbacks."
+version: 0.0.2
+repository: https://github.com/panicfrog/keyed_indexed_stack
 
 environment:
-  sdk: ^3.9.2
-  flutter: ">=1.17.0"
+  sdk: '>=3.1.0 <4.0.0'
+  flutter: ">=3.13.0"
 
 dependencies:
   flutter:
