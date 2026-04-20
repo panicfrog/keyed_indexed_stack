@@ -9,7 +9,8 @@ typedef OnChildCallback<T> = void Function(T key);
 ///
 /// Unlike [IndexedStack] which eagerly builds all children, this widget only
 /// builds children that are active, kept alive, or preheated. Children are
-/// constructed on first access and optionally disposed when no longer needed.
+/// constructed when first needed, may remain mounted while inactive, and may be
+/// disposed when no longer needed.
 ///
 /// Keys can be any type that correctly implements `==` and `hashCode`
 /// (e.g. enums, strings, ints). Custom classes must override both to ensure
@@ -60,10 +61,15 @@ class LazyIndexedStack<T> extends StatefulWidget {
   /// Keys that should be built offstage before becoming visible.
   final Set<T> preheat;
 
-  /// Called before switching from one key to another.
+  /// Called after the active key changes from one value to another.
+  ///
+  /// This callback is scheduled after the widget update has been processed.
   final OnSwitchCallback<T>? onSwitch;
 
-  /// Called when a child is first built and mounted.
+  /// Called when a child is added to the widget tree.
+  ///
+  /// If a child is later removed and rebuilt again, this callback will fire
+  /// again for that key.
   final OnChildCallback<T>? onChildBuilt;
 
   /// Called when a child is removed from the widget tree.
@@ -93,15 +99,25 @@ class _LazyIndexedStackState<T> extends State<LazyIndexedStack<T>> {
   final Set<T> _builtKeys = {};
   final Set<T> _controllerKeepAlive = {};
   final Set<T> _controllerPreheated = {};
+  final Set<T> _forceDisposedKeys = {};
   // Prevents re-adding consumed preheat keys from widget.preheat on rebuilds.
   final Set<T> _consumedPreheat = {};
+
+  Set<T> get _declarativePreheat => widget.preheat.difference(_consumedPreheat);
+
+  Set<T> get _retainedKeys {
+    return <T>{
+      ...widget.keepAlive,
+      ..._declarativePreheat,
+      ..._controllerKeepAlive,
+      ..._controllerPreheated,
+    };
+  }
 
   Set<T> get _activeKeys {
     return <T>{
       widget.index,
-      ...widget.keepAlive,
-      ..._controllerKeepAlive,
-      ..._controllerPreheated,
+      ..._retainedKeys.difference(_forceDisposedKeys),
     };
   }
 
@@ -109,6 +125,7 @@ class _LazyIndexedStackState<T> extends State<LazyIndexedStack<T>> {
     widget.controller?.attach(
       preheat: _handleControllerPreheat,
       disposeKeys: _handleControllerDisposeKeys,
+      forceDisposeKeys: _handleControllerForceDisposeKeys,
       addKeepAlive: _handleControllerAddKeepAlive,
       removeKeepAlive: _handleControllerRemoveKeepAlive,
       getBuiltKeys: () => Set<T>.from(_builtKeys),
@@ -122,7 +139,6 @@ class _LazyIndexedStackState<T> extends State<LazyIndexedStack<T>> {
   void initState() {
     super.initState();
     _attachController();
-    _controllerPreheated.addAll(widget.preheat);
     _builtKeys.addAll(_activeKeys);
     final initialBuilt = _activeKeys;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -143,24 +159,23 @@ class _LazyIndexedStackState<T> extends State<LazyIndexedStack<T>> {
     }
 
     final removedPreheat = oldWidget.preheat.difference(widget.preheat);
-    if (removedPreheat.isNotEmpty) {
-      _controllerPreheated.removeAll(removedPreheat);
-    }
-    final newPreheat =
-        widget.preheat.difference(_controllerPreheated).difference(_consumedPreheat);
-    if (newPreheat.isNotEmpty) {
-      _controllerPreheated.addAll(newPreheat);
-    }
+    _consumedPreheat.removeAll(removedPreheat);
+    final newlyDeclaredRetained = <T>{
+      ...widget.keepAlive.difference(oldWidget.keepAlive),
+      ...widget.preheat.difference(oldWidget.preheat),
+    };
+    _forceDisposedKeys.removeAll(newlyDeclaredRetained);
 
     if (oldWidget.index != widget.index) {
       final from = oldWidget.index;
       final to = widget.index;
-      if (_controllerPreheated.remove(from)) {
+      if (widget.preheat.contains(from)) {
         _consumedPreheat.add(from);
       }
-      if (_controllerPreheated.remove(to)) {
+      if (widget.preheat.contains(to)) {
         _consumedPreheat.add(to);
       }
+      _forceDisposedKeys.remove(to);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         widget.onSwitch?.call(from, to);
@@ -205,6 +220,7 @@ class _LazyIndexedStackState<T> extends State<LazyIndexedStack<T>> {
   }
 
   void _handleControllerPreheat(Set<T> keys) {
+    _forceDisposedKeys.removeAll(keys);
     _controllerPreheated.addAll(keys);
     _reconcile();
   }
@@ -215,7 +231,16 @@ class _LazyIndexedStackState<T> extends State<LazyIndexedStack<T>> {
     _reconcile();
   }
 
+  void _handleControllerForceDisposeKeys(Set<T> keys) {
+    final filteredKeys = keys.where((key) => key != widget.index);
+    _controllerPreheated.removeAll(filteredKeys);
+    _controllerKeepAlive.removeAll(filteredKeys);
+    _forceDisposedKeys.addAll(filteredKeys);
+    _reconcile();
+  }
+
   void _handleControllerAddKeepAlive(Set<T> keys) {
+    _forceDisposedKeys.removeAll(keys);
     _controllerKeepAlive.addAll(keys);
     _reconcile();
   }
@@ -226,7 +251,8 @@ class _LazyIndexedStackState<T> extends State<LazyIndexedStack<T>> {
   }
 
   void _handleControllerSwitchTo(T key) {
-    assert(widget.onIndexRequested != null,
+    assert(
+        widget.onIndexRequested != null,
         'LazyIndexedStack.onIndexRequested must be provided for controller.switchTo() to work. '
         'Add onIndexRequested: (key) => setState(() => _currentTab = key) to your LazyIndexedStack.');
     widget.onIndexRequested?.call(key);

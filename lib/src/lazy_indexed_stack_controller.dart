@@ -18,12 +18,14 @@
 /// // Later:
 /// controller.preheat({Tab.search});       // Build search page offstage
 /// controller.addKeepAlive({Tab.home});    // Keep home page alive forever
-/// controller.disposeKeys({Tab.settings}); // Dispose settings page
+/// controller.disposeKeys({Tab.search});   // Release controller retention
+/// controller.forceDisposeKeys({Tab.settings}); // Force-dispose settings page
 /// ```
 /// {@end-tool}
 class LazyIndexedStackController<T> {
   void Function(Set<T>)? _preheat;
   void Function(Set<T>)? _disposeKeys;
+  void Function(Set<T>)? _forceDisposeKeys;
   void Function(Set<T>)? _addKeepAlive;
   void Function(Set<T>)? _removeKeepAlive;
   Set<T> Function()? _getBuiltKeys;
@@ -35,6 +37,7 @@ class LazyIndexedStackController<T> {
   void attach({
     required void Function(Set<T>) preheat,
     required void Function(Set<T>) disposeKeys,
+    required void Function(Set<T>) forceDisposeKeys,
     required void Function(Set<T>) addKeepAlive,
     required void Function(Set<T>) removeKeepAlive,
     required Set<T> Function() getBuiltKeys,
@@ -44,6 +47,7 @@ class LazyIndexedStackController<T> {
   }) {
     _preheat = preheat;
     _disposeKeys = disposeKeys;
+    _forceDisposeKeys = forceDisposeKeys;
     _addKeepAlive = addKeepAlive;
     _removeKeepAlive = removeKeepAlive;
     _getBuiltKeys = getBuiltKeys;
@@ -55,6 +59,7 @@ class LazyIndexedStackController<T> {
   void detach() {
     _preheat = null;
     _disposeKeys = null;
+    _forceDisposeKeys = null;
     _addKeepAlive = null;
     _removeKeepAlive = null;
     _getBuiltKeys = null;
@@ -66,20 +71,33 @@ class LazyIndexedStackController<T> {
   /// Imperatively preheat (build + mount offstage) the given keys.
   ///
   /// Children at these keys will be built immediately if not already built.
-  /// They remain mounted until explicitly removed via [disposeKeys].
+  /// They remain mounted until they are no longer part of the active,
+  /// keep-alive, or preheated sets.
   void preheat(Set<T> keys) {
-    assert(_preheat != null, 'Controller is not attached to a LazyIndexedStack');
+    assert(
+        _preheat != null, 'Controller is not attached to a LazyIndexedStack');
     _preheat!(keys);
   }
 
-  /// Dispose (remove from tree) the children at given keys.
+  /// Release controller-managed retention for the given keys.
   ///
-  /// Will not dispose the current active key or keys that are in the
-  /// widget's keepAlive.
+  /// This removes keys from the controller's dynamic preheat and keep-alive
+  /// sets, then reconciles the tree. Keys that are still active or retained by
+  /// declarative [LazyIndexedStack.keepAlive] / [LazyIndexedStack.preheat] may
+  /// remain built after this call.
   void disposeKeys(Set<T> keys) {
     assert(_disposeKeys != null,
         'Controller is not attached to a LazyIndexedStack');
     _disposeKeys!(keys);
+  }
+
+  /// Force-dispose the given keys, even if they are retained declaratively.
+  ///
+  /// The current active key is never force-disposed.
+  void forceDisposeKeys(Set<T> keys) {
+    assert(_forceDisposeKeys != null,
+        'Controller is not attached to a LazyIndexedStack');
+    _forceDisposeKeys!(keys);
   }
 
   /// Dynamically add keys to the keep-alive set.
@@ -94,8 +112,7 @@ class LazyIndexedStackController<T> {
 
   /// Dynamically remove keys from the controller's keep-alive set.
   ///
-  /// Removed keys that are not the active key and not in the widget's
-  /// keepAlive or preheat will be disposed.
+  /// Removed keys that are not otherwise retained may be disposed.
   void removeKeepAlive(Set<T> keys) {
     assert(_removeKeepAlive != null,
         'Controller is not attached to a LazyIndexedStack');
@@ -103,8 +120,7 @@ class LazyIndexedStackController<T> {
   }
 
   /// Returns the set of keys currently built (mounted in the tree).
-  Set<T> get builtKeys =>
-      _getBuiltKeys != null ? _getBuiltKeys!() : const {};
+  Set<T> get builtKeys => _getBuiltKeys != null ? _getBuiltKeys!() : const {};
 
   /// Returns the currently active key, or null if not attached.
   T? get currentKey => _getCurrentKey?.call();
@@ -115,14 +131,14 @@ class LazyIndexedStackController<T> {
   /// Switch to the given key.
   ///
   /// Triggers [LazyIndexedStack.onIndexRequested] to notify the parent
-  /// to update the active key. If the child at [key] is not yet built,
-  /// it will be built in the same frame.
+  /// to update the active key. The parent is responsible for updating
+  /// [LazyIndexedStack.index] in response.
   ///
   /// The parent must provide [LazyIndexedStack.onIndexRequested] for this
   /// to have any effect.
   void switchTo(T key) {
-    assert(_switchTo != null,
-        'Controller is not attached to a LazyIndexedStack');
+    assert(
+        _switchTo != null, 'Controller is not attached to a LazyIndexedStack');
     _switchTo!(key);
   }
 }

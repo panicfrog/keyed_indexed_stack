@@ -35,7 +35,6 @@ class _DemoPageState extends State<DemoPage> {
   final _controller = LazyIndexedStackController<AppTab>();
   final _log = <String>[];
 
-
   void _logEvent(String event) {
     setState(() {
       _log.insert(0, event);
@@ -60,7 +59,10 @@ class _DemoPageState extends State<DemoPage> {
                   _logEvent('SwitchTo ${AppTab.profile.name}');
                 case 'dispose':
                   _controller.disposeKeys({AppTab.about});
-                  _logEvent('Disposed ${AppTab.about.name}');
+                  _logEvent('Released ${AppTab.about.name}');
+                case 'forceDispose':
+                  _controller.forceDisposeKeys({AppTab.about});
+                  _logEvent('ForceDisposed ${AppTab.about.name}');
                 case 'keepAlive':
                   _controller.addKeepAlive({AppTab.home});
                   _logEvent('KeepAlive ${AppTab.home.name}');
@@ -71,17 +73,29 @@ class _DemoPageState extends State<DemoPage> {
             },
             itemBuilder: (context) => [
               PopupMenuItem(
-                  value: 'preheat', child: Text('Preheat ${AppTab.about.name}')),
+                value: 'preheat',
+                child: Text('Preheat ${AppTab.about.name}'),
+              ),
               PopupMenuItem(
-                  value: 'switchTo',
-                  child: Text('SwitchTo ${AppTab.profile.name} (preheat+switch)')),
+                value: 'switchTo',
+                child: Text('SwitchTo ${AppTab.profile.name} (preheat+switch)'),
+              ),
               PopupMenuItem(
-                  value: 'dispose', child: Text('Dispose ${AppTab.about.name}')),
+                value: 'dispose',
+                child: Text('Release ${AppTab.about.name}'),
+              ),
               PopupMenuItem(
-                  value: 'keepAlive', child: Text('KeepAlive ${AppTab.home.name}')),
+                value: 'forceDispose',
+                child: Text('ForceDispose ${AppTab.about.name}'),
+              ),
               PopupMenuItem(
-                  value: 'removeKeepAlive',
-                  child: Text('Remove keepAlive ${AppTab.home.name}')),
+                value: 'keepAlive',
+                child: Text('KeepAlive ${AppTab.home.name}'),
+              ),
+              PopupMenuItem(
+                value: 'removeKeepAlive',
+                child: Text('Remove keepAlive ${AppTab.home.name}'),
+              ),
             ],
           ),
         ],
@@ -124,9 +138,16 @@ class _DemoPageState extends State<DemoPage> {
                             FilledButton.tonal(
                               onPressed: () {
                                 _controller.disposeKeys({AppTab.about});
-                                _logEvent('Disposed ${AppTab.about.name}');
+                                _logEvent('Released ${AppTab.about.name}');
                               },
-                              child: Text('Dispose ${AppTab.about.name}'),
+                              child: Text('Release ${AppTab.about.name}'),
+                            ),
+                            FilledButton.tonal(
+                              onPressed: () {
+                                _controller.forceDisposeKeys({AppTab.about});
+                                _logEvent('ForceDisposed ${AppTab.about.name}');
+                              },
+                              child: Text('ForceDispose ${AppTab.about.name}'),
                             ),
                             OutlinedButton(
                               onPressed: () {
@@ -138,7 +159,9 @@ class _DemoPageState extends State<DemoPage> {
                             OutlinedButton(
                               onPressed: () {
                                 _controller.removeKeepAlive({AppTab.home});
-                                _logEvent('Remove keepAlive ${AppTab.home.name}');
+                                _logEvent(
+                                  'Remove keepAlive ${AppTab.home.name}',
+                                );
                               },
                               child: Text('UnKeepAlive ${AppTab.home.name}'),
                             ),
@@ -148,20 +171,20 @@ class _DemoPageState extends State<DemoPage> {
                       const Divider(height: 1),
                       Expanded(
                         child: LazyIndexedStack<AppTab>(
-                    index: _currentTab,
-                    controller: _controller,
-                    keepAlive: {AppTab.home},
-                    preheat: {AppTab.search},
-                    onIndexRequested: (key) =>
-                        setState(() => _currentTab = key),
-                    onSwitch: (from, to) =>
-                        _logEvent('Switch: ${from.name} -> ${to.name}'),
-                    onChildBuilt: (key) =>
-                        _logEvent('+ Built: ${key.name}'),
-                    onChildDisposed: (key) =>
-                        _logEvent('- Disposed: ${key.name}'),
-                    builder: (context, key) => _TabPage(tab: key),
-                  ),
+                          index: _currentTab,
+                          controller: _controller,
+                          keepAlive: {AppTab.home},
+                          preheat: {AppTab.search},
+                          onIndexRequested: (key) =>
+                              setState(() => _currentTab = key),
+                          onSwitch: (from, to) =>
+                              _logEvent('Switch: ${from.name} -> ${to.name}'),
+                          onChildBuilt: (key) =>
+                              _logEvent('+ Built: ${key.name}'),
+                          onChildDisposed: (key) =>
+                              _logEvent('- Disposed: ${key.name}'),
+                          builder: (context, key) => _TabPage(tab: key),
+                        ),
                       ),
                     ],
                   ),
@@ -169,8 +192,9 @@ class _DemoPageState extends State<DemoPage> {
                 SizedBox(
                   width: 220,
                   child: ColoredBox(
-                    color:
-                        Theme.of(context).colorScheme.surfaceContainerHighest,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -210,15 +234,25 @@ class _DemoPageState extends State<DemoPage> {
             setState(() => _currentTab = AppTab.values[i]),
         destinations: [
           NavigationDestination(
-              icon: const Icon(Icons.home), label: AppTab.home.name),
+            icon: const Icon(Icons.home),
+            label: AppTab.home.name,
+          ),
           NavigationDestination(
-              icon: const Icon(Icons.search), label: AppTab.search.name),
+            icon: const Icon(Icons.search),
+            label: AppTab.search.name,
+          ),
           NavigationDestination(
-              icon: const Icon(Icons.person), label: AppTab.profile.name),
+            icon: const Icon(Icons.person),
+            label: AppTab.profile.name,
+          ),
           NavigationDestination(
-              icon: const Icon(Icons.settings), label: AppTab.settings.name),
+            icon: const Icon(Icons.settings),
+            label: AppTab.settings.name,
+          ),
           NavigationDestination(
-              icon: const Icon(Icons.info), label: AppTab.about.name),
+            icon: const Icon(Icons.info),
+            label: AppTab.about.name,
+          ),
         ],
       ),
     );
@@ -227,10 +261,7 @@ class _DemoPageState extends State<DemoPage> {
 
 /// A horizontal bar showing the build status of each tab.
 class _BuildStatusBar extends StatelessWidget {
-  const _BuildStatusBar({
-    required this.builtKeys,
-    required this.currentTab,
-  });
+  const _BuildStatusBar({required this.builtKeys, required this.currentTab});
 
   final Set<AppTab> builtKeys;
   final AppTab currentTab;
@@ -272,8 +303,9 @@ class _BuildStatusBar extends StatelessWidget {
                             ? Icons.check_circle
                             : Icons.radio_button_unchecked,
                         size: 16,
-                        color:
-                            isBuilt ? colorScheme.primary : colorScheme.outline,
+                        color: isBuilt
+                            ? colorScheme.primary
+                            : colorScheme.outline,
                       ),
                       const SizedBox(height: 2),
                       Text(
@@ -320,11 +352,15 @@ class _TabPageState extends State<_TabPage> {
         children: [
           Icon(_iconFor(widget.tab), size: 64),
           const SizedBox(height: 16),
-          Text(widget.tab.name,
-              style: Theme.of(context).textTheme.headlineMedium),
+          Text(
+            widget.tab.name,
+            style: Theme.of(context).textTheme.headlineMedium,
+          ),
           const SizedBox(height: 8),
-          Text('Counter: $_counter',
-              style: Theme.of(context).textTheme.titleLarge),
+          Text(
+            'Counter: $_counter',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
           const SizedBox(height: 16),
           FilledButton(
             onPressed: () => setState(() => _counter++),

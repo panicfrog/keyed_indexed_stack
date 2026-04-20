@@ -179,7 +179,8 @@ void main() {
       expect(built, [Tab.home, Tab.profile]);
     });
 
-    testWidgets('controller.disposeKeys removes children', (tester) async {
+    testWidgets('controller.disposeKeys releases controller-preheated children',
+        (tester) async {
       final controller = LazyIndexedStackController<Tab>();
       final disposed = <Tab>[];
       final built = <Tab>[];
@@ -199,6 +200,25 @@ void main() {
       controller.disposeKeys({Tab.profile});
       await tester.pump();
       expect(disposed, [Tab.profile]);
+    });
+
+    testWidgets('controller.disposeKeys does not remove declarative preheat',
+        (tester) async {
+      final controller = LazyIndexedStackController<Tab>();
+      final disposed = <Tab>[];
+      await tester.pumpWidget(buildSut(
+        index: Tab.home,
+        preheat: {Tab.profile},
+        controller: controller,
+        onChildDisposed: disposed.add,
+      ));
+      await tester.pump();
+
+      controller.disposeKeys({Tab.profile});
+      await tester.pump();
+
+      expect(disposed, isEmpty);
+      expect(controller.isBuilt(Tab.profile), isTrue);
     });
 
     testWidgets('controller.addKeepAlive and removeKeepAlive work',
@@ -233,6 +253,90 @@ void main() {
       controller.disposeKeys({Tab.profile});
       await tester.pump();
       expect(disposed, [Tab.home, Tab.profile]);
+    });
+
+    testWidgets('controller.forceDisposeKeys removes declarative preheat',
+        (tester) async {
+      final controller = LazyIndexedStackController<Tab>();
+      final disposed = <Tab>[];
+      await tester.pumpWidget(buildSut(
+        index: Tab.home,
+        preheat: {Tab.profile},
+        controller: controller,
+        onChildDisposed: disposed.add,
+      ));
+      await tester.pump();
+      expect(controller.isBuilt(Tab.profile), isTrue);
+
+      controller.forceDisposeKeys({Tab.profile});
+      await tester.pump();
+
+      expect(disposed, [Tab.profile]);
+      expect(controller.isBuilt(Tab.profile), isFalse);
+    });
+
+    testWidgets('controller.forceDisposeKeys removes declarative keepAlive',
+        (tester) async {
+      final controller = LazyIndexedStackController<Tab>();
+      final disposed = <Tab>[];
+      await tester.pumpWidget(buildSut(
+        index: Tab.search,
+        keepAlive: {Tab.profile},
+        controller: controller,
+        onChildDisposed: disposed.add,
+      ));
+      await tester.pump();
+      expect(controller.isBuilt(Tab.profile), isTrue);
+
+      controller.forceDisposeKeys({Tab.profile});
+      await tester.pump();
+
+      expect(disposed, [Tab.profile]);
+      expect(controller.isBuilt(Tab.profile), isFalse);
+    });
+
+    testWidgets('controller.forceDisposeKeys does not remove active key',
+        (tester) async {
+      final controller = LazyIndexedStackController<Tab>();
+      final disposed = <Tab>[];
+      await tester.pumpWidget(buildSut(
+        index: Tab.home,
+        controller: controller,
+        onChildDisposed: disposed.add,
+      ));
+      await tester.pump();
+
+      controller.forceDisposeKeys({Tab.home});
+      await tester.pump();
+
+      expect(disposed, isEmpty);
+      expect(controller.isBuilt(Tab.home), isTrue);
+    });
+
+    testWidgets('controller.preheat clears forced disposal for a key',
+        (tester) async {
+      final controller = LazyIndexedStackController<Tab>();
+      final disposed = <Tab>[];
+      final built = <Tab>[];
+      await tester.pumpWidget(buildSut(
+        index: Tab.home,
+        preheat: {Tab.profile},
+        controller: controller,
+        onChildBuilt: built.add,
+        onChildDisposed: disposed.add,
+      ));
+      await tester.pump();
+      expect(built, containsAll([Tab.home, Tab.profile]));
+
+      controller.forceDisposeKeys({Tab.profile});
+      await tester.pump();
+      expect(disposed, [Tab.profile]);
+      expect(controller.isBuilt(Tab.profile), isFalse);
+
+      controller.preheat({Tab.profile});
+      await tester.pump();
+      expect(controller.isBuilt(Tab.profile), isTrue);
+      expect(built, contains(Tab.profile));
     });
 
     testWidgets('controller.builtKeys and isBuilt report correctly',

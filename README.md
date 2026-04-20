@@ -4,7 +4,8 @@ A lazy-loading replacement for Flutter's `IndexedStack`.
 
 Unlike `IndexedStack` which eagerly builds all children at once, this widget
 only builds children that are active, kept alive, or preheated. Children are
-constructed on first access and optionally disposed when no longer needed.
+constructed when first needed, may remain mounted while inactive, and may be
+disposed when no longer needed.
 
 ## Features
 
@@ -14,6 +15,19 @@ constructed on first access and optionally disposed when no longer needed.
 - **Preheat** — build children offstage before they become visible
 - **Lifecycle callbacks** — `onSwitch`, `onChildBuilt`, `onChildDisposed`
 - **Controller** — imperative API for preheat, dispose, keep-alive, and switching
+
+## Behavior Notes
+
+- `onSwitch` fires after the `index` change has been applied, not before.
+- `onChildBuilt` fires whenever a key is added to the tree. If a child is
+  disposed and later rebuilt, the callback fires again.
+- `controller.switchTo()` only requests a switch through `onIndexRequested`.
+  The parent must update `index` for the visible child to change.
+- `controller.disposeKeys()` only releases controller-managed retention for
+  those keys. Declarative `keepAlive` / `preheat` still apply.
+- `controller.forceDisposeKeys()` is the explicit override. It can remove
+  declaratively retained children, but it does not remove the current active
+  child.
 
 ## Usage
 
@@ -55,7 +69,8 @@ LazyIndexedStack<Tab>(
 // Imperative commands:
 controller.preheat({Tab.search});        // Build search offstage
 controller.addKeepAlive({Tab.home});     // Keep home alive forever
-controller.disposeKeys({Tab.search});    // Remove search from tree
+controller.disposeKeys({Tab.search});    // Release controller retention
+controller.forceDisposeKeys({Tab.search}); // Force-remove search from tree
 controller.switchTo(Tab.profile);        // Switch to profile
 ```
 
@@ -82,8 +97,8 @@ LazyIndexedStack<Tab>(
 | `controller` | `LazyIndexedStackController<T>?` | Imperative control |
 | `keepAlive` | `Set<T>` | Keys that stay built when inactive |
 | `preheat` | `Set<T>` | Keys to build offstage before visiting |
-| `onSwitch` | `void Function(T from, T to)?` | Called on index change |
-| `onChildBuilt` | `void Function(T)?` | Called when child is first built |
+| `onSwitch` | `void Function(T from, T to)?` | Called after the active index changes |
+| `onChildBuilt` | `void Function(T)?` | Called whenever a child is added to the tree |
 | `onChildDisposed` | `void Function(T)?` | Called when child is removed |
 | `onIndexRequested` | `void Function(T)?` | Called by `controller.switchTo()` |
 
@@ -94,10 +109,11 @@ Stack pass-through: `alignment`, `textDirection`, `clipBehavior`, `sizing`.
 | Method | Description |
 |---|---|
 | `preheat(Set<T>)` | Build children offstage |
-| `disposeKeys(Set<T>)` | Remove children from tree |
+| `disposeKeys(Set<T>)` | Release controller-managed retention and reconcile built children |
+| `forceDisposeKeys(Set<T>)` | Force-remove built children even if declaratively retained |
 | `addKeepAlive(Set<T>)` | Add to keep-alive set |
 | `removeKeepAlive(Set<T>)` | Remove from keep-alive set |
-| `switchTo(T)` | Switch active key (requires `onIndexRequested`) |
+| `switchTo(T)` | Request an active key change via `onIndexRequested` |
 
 | Property | Description |
 |---|---|
