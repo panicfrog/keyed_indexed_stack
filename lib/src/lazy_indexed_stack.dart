@@ -36,6 +36,8 @@ class LazyIndexedStack<T> extends StatefulWidget {
     this.controller,
     this.keepAlive = const {},
     this.preheat = const {},
+    this.maintainAnimationWhenInactive = false,
+    this.maintainAnimationWhenInactiveKeys = const {},
     this.onSwitch,
     this.onChildBuilt,
     this.onChildDisposed,
@@ -60,6 +62,19 @@ class LazyIndexedStack<T> extends StatefulWidget {
 
   /// Keys that should be built offstage before becoming visible.
   final Set<T> preheat;
+
+  /// Whether inactive but built children should keep running animations.
+  ///
+  /// This only affects children that remain mounted while inactive, such as
+  /// children retained by [keepAlive] or [preheat]. The active child always
+  /// keeps its animations enabled.
+  final bool maintainAnimationWhenInactive;
+
+  /// Keys that should keep running animations while inactive.
+  ///
+  /// This overrides [maintainAnimationWhenInactive] for the listed keys.
+  /// The active child always keeps its animations enabled regardless.
+  final Set<T> maintainAnimationWhenInactiveKeys;
 
   /// Called after the active key changes from one value to another.
   ///
@@ -269,16 +284,23 @@ class _LazyIndexedStackState<T> extends State<LazyIndexedStack<T>> {
       clipBehavior: widget.clipBehavior,
       children: [
         for (final key in builtList)
-          Visibility(
-            key: ValueKey(key),
-            visible: key == widget.index,
-            maintainState: true,
-            maintainSize: true,
-            maintainAnimation: true,
-            child: KeyedSubtree(
-              child: widget.builder(context, key),
-            ),
-          ),
+          (() {
+            final isActive = key == widget.index;
+            final maintainAnimation = isActive ||
+                widget.maintainAnimationWhenInactive ||
+                widget.maintainAnimationWhenInactiveKeys.contains(key);
+
+            return KeyedSubtree(
+              key: ValueKey(key),
+              child: TickerMode(
+                enabled: maintainAnimation,
+                child: Offstage(
+                  offstage: !isActive,
+                  child: widget.builder(context, key),
+                ),
+              ),
+            );
+          })(),
       ],
     );
   }

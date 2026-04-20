@@ -32,6 +32,44 @@ class _TrackedChildState extends State<_TrackedChild> {
   Widget build(BuildContext context) => Text(widget.label);
 }
 
+class _TickingChild extends StatefulWidget {
+  const _TickingChild(this.tab, this.tickCounts);
+
+  final Tab tab;
+  final Map<Tab, int> tickCounts;
+
+  @override
+  State<_TickingChild> createState() => _TickingChildState();
+}
+
+class _TickingChildState extends State<_TickingChild>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 100),
+    )
+      ..addListener(() {
+        widget.tickCounts[widget.tab] =
+            (widget.tickCounts[widget.tab] ?? 0) + 1;
+      })
+      ..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Text('Ticker ${widget.tab.name}');
+}
+
 void main() {
   group('LazyIndexedStack', () {
     Widget buildSut({
@@ -155,12 +193,15 @@ void main() {
         preheat: {Tab.search},
       ));
       expect(find.text('Page home'), findsOneWidget);
-      final pageSearch = find.text('Page search');
+      final pageSearch = find.text('Page search', skipOffstage: false);
       expect(pageSearch, findsOneWidget);
-      final visibility = tester.widget<Visibility>(
-        find.ancestor(of: pageSearch, matching: find.byType(Visibility)),
+      final offstageFinder = find.ancestor(
+        of: pageSearch,
+        matching: find.byWidgetPredicate(
+          (widget) => widget is Offstage && widget.offstage,
+        ),
       );
-      expect(visibility.visible, isFalse);
+      expect(offstageFinder, findsOneWidget);
     });
 
     testWidgets('controller.preheat builds children', (tester) async {
@@ -411,6 +452,92 @@ void main() {
       await tester.pump();
       expect(disposeCounts[Tab.home], isNull);
       expect(initCounts[Tab.home], 1);
+    });
+
+    testWidgets('inactive keepAlive child pauses ticker by default',
+        (tester) async {
+      final tickCounts = <Tab, int>{};
+
+      Widget buildApp(Tab index) => MaterialApp(
+            home: LazyIndexedStack<Tab>(
+              index: index,
+              keepAlive: {Tab.home},
+              builder: (context, key) => _TickingChild(key, tickCounts),
+            ),
+          );
+
+      await tester.pumpWidget(buildApp(Tab.home));
+      await tester.pump(const Duration(milliseconds: 200));
+      final homeWhileActive = tickCounts[Tab.home] ?? 0;
+      expect(homeWhileActive, greaterThan(0));
+
+      await tester.pumpWidget(buildApp(Tab.search));
+      await tester.pump();
+      final beforeInactivePump = tickCounts[Tab.home] ?? 0;
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(tickCounts[Tab.home] ?? 0, beforeInactivePump);
+
+      await tester.pumpWidget(buildApp(Tab.home));
+      await tester.pump();
+      final beforeResumePump = tickCounts[Tab.home] ?? 0;
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(tickCounts[Tab.home] ?? 0, greaterThan(beforeResumePump));
+    });
+
+    testWidgets('inactive preheated child pauses ticker by default',
+        (tester) async {
+      final tickCounts = <Tab, int>{};
+
+      await tester.pumpWidget(MaterialApp(
+        home: LazyIndexedStack<Tab>(
+          index: Tab.home,
+          preheat: {Tab.profile},
+          builder: (context, key) => _TickingChild(key, tickCounts),
+        ),
+      ));
+      await tester.pump();
+      final beforePump = tickCounts[Tab.profile] ?? 0;
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(tickCounts[Tab.profile] ?? 0, beforePump);
+    });
+
+    testWidgets('global inactive animation policy preserves old behavior',
+        (tester) async {
+      final tickCounts = <Tab, int>{};
+
+      await tester.pumpWidget(MaterialApp(
+        home: LazyIndexedStack<Tab>(
+          index: Tab.search,
+          keepAlive: {Tab.home},
+          maintainAnimationWhenInactive: true,
+          builder: (context, key) => _TickingChild(key, tickCounts),
+        ),
+      ));
+      await tester.pump();
+      final beforePump = tickCounts[Tab.home] ?? 0;
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(tickCounts[Tab.home] ?? 0, greaterThan(beforePump));
+    });
+
+    testWidgets(
+        'per-key inactive animation override keeps selected ticker running',
+        (tester) async {
+      final tickCounts = <Tab, int>{};
+
+      await tester.pumpWidget(MaterialApp(
+        home: LazyIndexedStack<Tab>(
+          index: Tab.home,
+          preheat: {Tab.profile, Tab.settings},
+          maintainAnimationWhenInactiveKeys: {Tab.profile},
+          builder: (context, key) => _TickingChild(key, tickCounts),
+        ),
+      ));
+      await tester.pump();
+      final profileBeforePump = tickCounts[Tab.profile] ?? 0;
+      final settingsBeforePump = tickCounts[Tab.settings] ?? 0;
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(tickCounts[Tab.profile] ?? 0, greaterThan(profileBeforePump));
+      expect(tickCounts[Tab.settings] ?? 0, settingsBeforePump);
     });
 
     testWidgets('works with String keys', (tester) async {

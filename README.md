@@ -13,6 +13,7 @@ disposed when no longer needed.
 - **Generic keys** — use enums, strings, or any type with proper `==` and `hashCode`
 - **Keep-alive** — specify keys that should stay built when inactive
 - **Preheat** — build children offstage before they become visible
+- **Inactive ticker control** — pause hidden retained children by default, with opt-in overrides
 - **Lifecycle callbacks** — `onSwitch`, `onChildBuilt`, `onChildDisposed`
 - **Controller** — imperative API for preheat, dispose, keep-alive, and switching
 
@@ -28,6 +29,9 @@ disposed when no longer needed.
 - `controller.forceDisposeKeys()` is the explicit override. It can remove
   declaratively retained children, but it does not remove the current active
   child.
+- Inactive children retained by `keepAlive` / `preheat` pause tickers by
+  default. Use `maintainAnimationWhenInactive` or
+  `maintainAnimationWhenInactiveKeys` to opt back into background animation.
 
 ## Usage
 
@@ -53,6 +57,21 @@ class _MyAppState extends State<MyApp> {
   }
 }
 ```
+
+### Inactive animation policy
+
+```dart
+LazyIndexedStack<Tab>(
+  index: _currentTab,
+  keepAlive: {Tab.home, Tab.profile},
+  maintainAnimationWhenInactiveKeys: {Tab.profile},
+  builder: (context, key) => MyPage(tab: key),
+);
+```
+
+- Default behavior: inactive built children pause tickers and animations
+- `maintainAnimationWhenInactive: true`: preserve the previous global behavior
+- `maintainAnimationWhenInactiveKeys`: keep animations running for specific keys only
 
 ### With controller
 
@@ -97,6 +116,8 @@ LazyIndexedStack<Tab>(
 | `controller` | `LazyIndexedStackController<T>?` | Imperative control |
 | `keepAlive` | `Set<T>` | Keys that stay built when inactive |
 | `preheat` | `Set<T>` | Keys to build offstage before visiting |
+| `maintainAnimationWhenInactive` | `bool` | Whether inactive built children keep running animations |
+| `maintainAnimationWhenInactiveKeys` | `Set<T>` | Per-key override for inactive animation retention |
 | `onSwitch` | `void Function(T from, T to)?` | Called after the active index changes |
 | `onChildBuilt` | `void Function(T)?` | Called whenever a child is added to the tree |
 | `onChildDisposed` | `void Function(T)?` | Called when child is removed |

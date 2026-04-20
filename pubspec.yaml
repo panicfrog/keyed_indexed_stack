@@ -1,6 +1,6 @@
 name: keyed_indexed_stack
 description: "A lazy-loading replacement for IndexedStack with generic keys, keep-alive, preheat, and lifecycle callbacks."
-version: 0.1.0
+version: 0.2.0
 repository: https://github.com/panicfrog/keyed_indexed_stack
 
 environment:

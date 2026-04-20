@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:keyed_indexed_stack/keyed_indexed_stack.dart';
+import 'dart:async';
 
-enum AppTab { home, search, profile, settings, about }
+enum AppTab { home, chart, player }
 
 void main() {
   runApp(const MyApp());
@@ -13,245 +14,114 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'LazyIndexedStack Demo',
+      title: 'LazyIndexedStack Profiling Demo',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2C6E49)),
         useMaterial3: true,
       ),
-      home: const DemoPage(),
+      home: const ProfilingDemoPage(),
     );
   }
 }
 
-class DemoPage extends StatefulWidget {
-  const DemoPage({super.key});
+class ProfilingDemoPage extends StatefulWidget {
+  const ProfilingDemoPage({super.key});
 
   @override
-  State<DemoPage> createState() => _DemoPageState();
+  State<ProfilingDemoPage> createState() => _ProfilingDemoPageState();
 }
 
-class _DemoPageState extends State<DemoPage> {
+class _ProfilingDemoPageState extends State<ProfilingDemoPage> {
   AppTab _currentTab = AppTab.home;
-  final _controller = LazyIndexedStackController<AppTab>();
-  final _log = <String>[];
-
-  void _logEvent(String event) {
-    setState(() {
-      _log.insert(0, event);
-      if (_log.length > 20) _log.removeLast();
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
+    final isCompact = MediaQuery.sizeOf(context).width < 1000;
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('LazyIndexedStack Demo'),
-        actions: [
-          PopupMenuButton<String>(
-            onSelected: (action) {
-              switch (action) {
-                case 'preheat':
-                  _controller.preheat({AppTab.about});
-                  _logEvent('Preheated ${AppTab.about.name}');
-                case 'switchTo':
-                  _controller.switchTo(AppTab.profile);
-                  _logEvent('SwitchTo ${AppTab.profile.name}');
-                case 'dispose':
-                  _controller.disposeKeys({AppTab.about});
-                  _logEvent('Released ${AppTab.about.name}');
-                case 'forceDispose':
-                  _controller.forceDisposeKeys({AppTab.about});
-                  _logEvent('ForceDisposed ${AppTab.about.name}');
-                case 'keepAlive':
-                  _controller.addKeepAlive({AppTab.home});
-                  _logEvent('KeepAlive ${AppTab.home.name}');
-                case 'removeKeepAlive':
-                  _controller.removeKeepAlive({AppTab.home});
-                  _logEvent('Remove keepAlive ${AppTab.home.name}');
-              }
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'preheat',
-                child: Text('Preheat ${AppTab.about.name}'),
-              ),
-              PopupMenuItem(
-                value: 'switchTo',
-                child: Text('SwitchTo ${AppTab.profile.name} (preheat+switch)'),
-              ),
-              PopupMenuItem(
-                value: 'dispose',
-                child: Text('Release ${AppTab.about.name}'),
-              ),
-              PopupMenuItem(
-                value: 'forceDispose',
-                child: Text('ForceDispose ${AppTab.about.name}'),
-              ),
-              PopupMenuItem(
-                value: 'keepAlive',
-                child: Text('KeepAlive ${AppTab.home.name}'),
-              ),
-              PopupMenuItem(
-                value: 'removeKeepAlive',
-                child: Text('Remove keepAlive ${AppTab.home.name}'),
-              ),
-            ],
-          ),
-        ],
-      ),
+      appBar: AppBar(title: const Text('LazyIndexedStack Profiling Demo')),
       body: Column(
         children: [
-          // Build status indicator bar.
-          _BuildStatusBar(
-            builtKeys: _controller.builtKeys,
-            currentTab: _currentTab,
-          ),
+          const _IntroCard(),
           const Divider(height: 1),
           Expanded(
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    children: [
-                      // Controller action buttons.
-                      Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: Wrap(
-                          spacing: 8,
-                          runSpacing: 4,
-                          children: [
-                            FilledButton.tonal(
-                              onPressed: () {
-                                _controller.preheat({AppTab.about});
-                                _logEvent('Preheated ${AppTab.about.name}');
-                              },
-                              child: Text('Preheat ${AppTab.about.name}'),
-                            ),
-                            FilledButton.tonal(
-                              onPressed: () {
-                                _controller.switchTo(AppTab.profile);
-                                _logEvent('SwitchTo ${AppTab.profile.name}');
-                              },
-                              child: Text('SwitchTo ${AppTab.profile.name}'),
-                            ),
-                            FilledButton.tonal(
-                              onPressed: () {
-                                _controller.disposeKeys({AppTab.about});
-                                _logEvent('Released ${AppTab.about.name}');
-                              },
-                              child: Text('Release ${AppTab.about.name}'),
-                            ),
-                            FilledButton.tonal(
-                              onPressed: () {
-                                _controller.forceDisposeKeys({AppTab.about});
-                                _logEvent('ForceDisposed ${AppTab.about.name}');
-                              },
-                              child: Text('ForceDispose ${AppTab.about.name}'),
-                            ),
-                            OutlinedButton(
-                              onPressed: () {
-                                _controller.addKeepAlive({AppTab.home});
-                                _logEvent('KeepAlive ${AppTab.home.name}');
-                              },
-                              child: Text('KeepAlive ${AppTab.home.name}'),
-                            ),
-                            OutlinedButton(
-                              onPressed: () {
-                                _controller.removeKeepAlive({AppTab.home});
-                                _logEvent(
-                                  'Remove keepAlive ${AppTab.home.name}',
-                                );
-                              },
-                              child: Text('UnKeepAlive ${AppTab.home.name}'),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Divider(height: 1),
-                      Expanded(
-                        child: LazyIndexedStack<AppTab>(
-                          index: _currentTab,
-                          controller: _controller,
-                          keepAlive: {AppTab.home},
-                          preheat: {AppTab.search},
-                          onIndexRequested: (key) =>
-                              setState(() => _currentTab = key),
-                          onSwitch: (from, to) =>
-                              _logEvent('Switch: ${from.name} -> ${to.name}'),
-                          onChildBuilt: (key) =>
-                              _logEvent('+ Built: ${key.name}'),
-                          onChildDisposed: (key) =>
-                              _logEvent('- Disposed: ${key.name}'),
-                          builder: (context, key) => _TabPage(tab: key),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(
-                  width: 220,
-                  child: ColoredBox(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.surfaceContainerHighest,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: isCompact
+                  ? ListView(
                       children: [
-                        Padding(
-                          padding: const EdgeInsets.all(8),
-                          child: Text(
-                            'Event Log',
-                            style: Theme.of(context).textTheme.titleSmall,
+                        _ScenarioCard(
+                          title: 'Paused When Inactive',
+                          subtitle:
+                              'Default behavior: hidden kept-alive tabs stop ticking.',
+                          currentTab: _currentTab,
+                          maintainAnimationWhenInactive: false,
+                          onIndexRequested: (tab) =>
+                              setState(() => _currentTab = tab),
+                        ),
+                        const SizedBox(height: 16),
+                        _ScenarioCard(
+                          title: 'Maintained When Inactive',
+                          subtitle:
+                              'Legacy behavior: hidden kept-alive tabs continue ticking.',
+                          currentTab: _currentTab,
+                          maintainAnimationWhenInactive: true,
+                          onIndexRequested: (tab) =>
+                              setState(() => _currentTab = tab),
+                        ),
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        Expanded(
+                          child: _ScenarioCard(
+                            title: 'Paused When Inactive',
+                            subtitle:
+                                'Default behavior: hidden kept-alive tabs stop ticking.',
+                            currentTab: _currentTab,
+                            maintainAnimationWhenInactive: false,
+                            onIndexRequested: (tab) =>
+                                setState(() => _currentTab = tab),
                           ),
                         ),
-                        const Divider(height: 1),
+                        const SizedBox(width: 16),
                         Expanded(
-                          child: ListView.builder(
-                            padding: const EdgeInsets.all(8),
-                            itemCount: _log.length,
-                            itemBuilder: (context, i) => Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 2),
-                              child: Text(
-                                _log[i],
-                                style: const TextStyle(fontSize: 11),
-                              ),
-                            ),
+                          child: _ScenarioCard(
+                            title: 'Maintained When Inactive',
+                            subtitle:
+                                'Legacy behavior: hidden kept-alive tabs continue ticking.',
+                            currentTab: _currentTab,
+                            maintainAnimationWhenInactive: true,
+                            onIndexRequested: (tab) =>
+                                setState(() => _currentTab = tab),
                           ),
                         ),
                       ],
                     ),
-                  ),
-                ),
-              ],
             ),
           ),
         ],
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentTab.index,
-        onDestinationSelected: (i) =>
-            setState(() => _currentTab = AppTab.values[i]),
-        destinations: [
+        onDestinationSelected: (index) {
+          setState(() => _currentTab = AppTab.values[index]);
+        },
+        destinations: const [
           NavigationDestination(
-            icon: const Icon(Icons.home),
-            label: AppTab.home.name,
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
+            label: 'Home',
           ),
           NavigationDestination(
-            icon: const Icon(Icons.search),
-            label: AppTab.search.name,
+            icon: Icon(Icons.show_chart_outlined),
+            selectedIcon: Icon(Icons.show_chart),
+            label: 'Chart',
           ),
           NavigationDestination(
-            icon: const Icon(Icons.person),
-            label: AppTab.profile.name,
-          ),
-          NavigationDestination(
-            icon: const Icon(Icons.settings),
-            label: AppTab.settings.name,
-          ),
-          NavigationDestination(
-            icon: const Icon(Icons.info),
-            label: AppTab.about.name,
+            icon: Icon(Icons.album_outlined),
+            selectedIcon: Icon(Icons.album),
+            label: 'Player',
           ),
         ],
       ),
@@ -259,125 +129,547 @@ class _DemoPageState extends State<DemoPage> {
   }
 }
 
-/// A horizontal bar showing the build status of each tab.
-class _BuildStatusBar extends StatelessWidget {
-  const _BuildStatusBar({required this.builtKeys, required this.currentTab});
+class _IntroCard extends StatelessWidget {
+  const _IntroCard();
 
-  final Set<AppTab> builtKeys;
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Profile hidden ticker behavior',
+                style: textTheme.titleLarge,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Both stacks keep every tab alive. Switch tabs and compare the tick counters. '
+                'In profile mode, the left stack should go quiet when hidden tabs move offstage, '
+                'while the right stack keeps producing frames for hidden animations. '
+                'Each card also exposes controller actions plus a live ticker status table so you can '
+                'verify when a hidden tab is actually paused.',
+                style: textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 12),
+              const Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _HintChip(label: 'KeepAlive on all tabs'),
+                  _HintChip(label: 'Continuous AnimationController.repeat()'),
+                  _HintChip(label: 'Compare paused vs maintained'),
+                  _HintChip(label: 'Live ticker status table'),
+                  _HintChip(label: 'Controller actions restored'),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HintChip extends StatelessWidget {
+  const _HintChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Chip(label: Text(label));
+  }
+}
+
+class _ScenarioCard extends StatefulWidget {
+  const _ScenarioCard({
+    required this.title,
+    required this.subtitle,
+    required this.currentTab,
+    required this.maintainAnimationWhenInactive,
+    this.onIndexRequested,
+  });
+
+  final String title;
+  final String subtitle;
   final AppTab currentTab;
+  final bool maintainAnimationWhenInactive;
+  final ValueChanged<AppTab>? onIndexRequested;
+
+  @override
+  State<_ScenarioCard> createState() => _ScenarioCardState();
+}
+
+class _ScenarioCardState extends State<_ScenarioCard> {
+  final _controller = LazyIndexedStackController<AppTab>();
+  final Map<AppTab, int> _tickCounts = {
+    for (final tab in AppTab.values) tab: 0,
+  };
+  final Map<AppTab, DateTime?> _lastTickTimes = {
+    for (final tab in AppTab.values) tab: null,
+  };
+  final Set<AppTab> _keepAlive = AppTab.values.toSet();
+  Timer? _statusTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _statusTimer = Timer.periodic(const Duration(milliseconds: 250), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _statusTimer?.cancel();
+    super.dispose();
+  }
+
+  void _recordTick(AppTab tab, int tickCount) {
+    _tickCounts[tab] = tickCount;
+    _lastTickTimes[tab] = DateTime.now();
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  void _toggleKeepAlive(AppTab tab) {
+    setState(() {
+      if (_keepAlive.contains(tab)) {
+        _keepAlive.remove(tab);
+      } else {
+        _keepAlive.add(tab);
+      }
+    });
+  }
+
+  bool _isTickerRunning(AppTab tab) {
+    final lastTickTime = _lastTickTimes[tab];
+    if (lastTickTime == null) return false;
+    return DateTime.now().difference(lastTickTime) <
+        const Duration(milliseconds: 450);
+  }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Lazy Build Status:   Green = built & alive   Grey = not built',
-            style: Theme.of(context).textTheme.labelSmall,
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: AppTab.values.map((tab) {
-              final isBuilt = builtKeys.contains(tab);
-              final isActive = tab == currentTab;
-              return Expanded(
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 2),
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  decoration: BoxDecoration(
-                    color: isBuilt
-                        ? colorScheme.primaryContainer
-                        : colorScheme.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(6),
-                    border: isActive
-                        ? Border.all(color: colorScheme.primary, width: 2)
-                        : null,
+    final builtKeys = _controller.builtKeys;
+
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              color: widget.maintainAnimationWhenInactive
+                  ? colorScheme.tertiaryContainer
+                  : colorScheme.primaryContainer,
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.title,
+                    style: Theme.of(context).textTheme.titleMedium,
                   ),
-                  child: Column(
-                    children: [
-                      Icon(
-                        isBuilt
-                            ? Icons.check_circle
-                            : Icons.radio_button_unchecked,
-                        size: 16,
-                        color: isBuilt
-                            ? colorScheme.primary
-                            : colorScheme.outline,
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        tab.name,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: isBuilt
-                              ? colorScheme.onPrimaryContainer
-                              : colorScheme.outline,
-                        ),
-                      ),
-                    ],
-                  ),
+                  const SizedBox(height: 4),
+                  Text(widget.subtitle),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: _ScenarioDiagnostics(
+                currentTab: widget.currentTab,
+                builtKeys: builtKeys,
+                keepAlive: _keepAlive,
+                tickCounts: _tickCounts,
+                isTickerRunning: _isTickerRunning,
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: _ScenarioControls(
+                currentTab: widget.currentTab,
+                keepAlive: _keepAlive,
+                onPreheatInactive: () => _controller.preheat(
+                  AppTab.values
+                      .where((tab) => tab != widget.currentTab)
+                      .toSet(),
                 ),
-              );
-            }).toList(),
-          ),
-        ],
+                onReleaseInactive: () => _controller.disposeKeys(
+                  AppTab.values
+                      .where((tab) => tab != widget.currentTab)
+                      .toSet(),
+                ),
+                onForceDisposeInactive: () => _controller.forceDisposeKeys(
+                  AppTab.values
+                      .where((tab) => tab != widget.currentTab)
+                      .toSet(),
+                ),
+                onSwitchToPlayer: () => _controller.switchTo(AppTab.player),
+                onToggleKeepAlive: _toggleKeepAlive,
+              ),
+            ),
+            SizedBox(
+              height: 420,
+              child: LazyIndexedStack<AppTab>(
+                index: widget.currentTab,
+                controller: _controller,
+                keepAlive: _keepAlive,
+                maintainAnimationWhenInactive:
+                    widget.maintainAnimationWhenInactive,
+                onIndexRequested: widget.onIndexRequested,
+                onChildBuilt: (_) {
+                  if (mounted) setState(() {});
+                },
+                onChildDisposed: (_) {
+                  if (mounted) setState(() {});
+                },
+                builder: (context, key) => _AnimatedTabPage(
+                  tab: key,
+                  accentColor: _colorForTab(key),
+                  onTick: (tickCount) => _recordTick(key, tickCount),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-/// A simple tab page with its own state (counter) to demonstrate state
-/// preservation when using keepAlive.
-class _TabPage extends StatefulWidget {
-  const _TabPage({required this.tab});
+class _ScenarioDiagnostics extends StatelessWidget {
+  const _ScenarioDiagnostics({
+    required this.currentTab,
+    required this.builtKeys,
+    required this.keepAlive,
+    required this.tickCounts,
+    required this.isTickerRunning,
+  });
 
-  final AppTab tab;
-
-  @override
-  State<_TabPage> createState() => _TabPageState();
-}
-
-class _TabPageState extends State<_TabPage> {
-  int _counter = 0;
+  final AppTab currentTab;
+  final Set<AppTab> builtKeys;
+  final Set<AppTab> keepAlive;
+  final Map<AppTab, int> tickCounts;
+  final bool Function(AppTab tab) isTickerRunning;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
+    final textTheme = Theme.of(context).textTheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Ticker status', style: textTheme.titleSmall),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final tab in AppTab.values)
+              _StatusTile(
+                label: tab.name,
+                icon: _iconFor(tab),
+                accentColor: _colorForTab(tab),
+                isActive: currentTab == tab,
+                isBuilt: builtKeys.contains(tab),
+                keepAlive: keepAlive.contains(tab),
+                isTickerRunning: isTickerRunning(tab),
+                tickCount: tickCounts[tab] ?? 0,
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _StatusTile extends StatelessWidget {
+  const _StatusTile({
+    required this.label,
+    required this.icon,
+    required this.accentColor,
+    required this.isActive,
+    required this.isBuilt,
+    required this.keepAlive,
+    required this.isTickerRunning,
+    required this.tickCount,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color accentColor;
+  final bool isActive;
+  final bool isBuilt;
+  final bool keepAlive;
+  final bool isTickerRunning;
+  final int tickCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 170,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: accentColor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isActive ? accentColor : accentColor.withValues(alpha: 0.3),
+          width: isActive ? 2 : 1,
+        ),
+      ),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(_iconFor(widget.tab), size: 64),
-          const SizedBox(height: 16),
-          Text(
-            widget.tab.name,
-            style: Theme.of(context).textTheme.headlineMedium,
+          Row(
+            children: [
+              Icon(icon, color: accentColor, size: 18),
+              const SizedBox(width: 8),
+              Text(label.toUpperCase()),
+            ],
           ),
           const SizedBox(height: 8),
-          Text(
-            'Counter: $_counter',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 16),
-          FilledButton(
-            onPressed: () => setState(() => _counter++),
-            child: const Text('Increment'),
-          ),
+          Text(isActive ? 'Visible now' : 'Hidden now'),
+          Text(isBuilt ? 'Built: yes' : 'Built: no'),
+          Text(keepAlive ? 'KeepAlive: yes' : 'KeepAlive: no'),
+          Text(isTickerRunning ? 'Ticker: running' : 'Ticker: paused'),
+          Text('Ticks: $tickCount'),
         ],
       ),
     );
   }
 }
 
+class _ScenarioControls extends StatelessWidget {
+  const _ScenarioControls({
+    required this.currentTab,
+    required this.keepAlive,
+    required this.onPreheatInactive,
+    required this.onReleaseInactive,
+    required this.onForceDisposeInactive,
+    required this.onSwitchToPlayer,
+    required this.onToggleKeepAlive,
+  });
+
+  final AppTab currentTab;
+  final Set<AppTab> keepAlive;
+  final VoidCallback onPreheatInactive;
+  final VoidCallback onReleaseInactive;
+  final VoidCallback onForceDisposeInactive;
+  final VoidCallback onSwitchToPlayer;
+  final ValueChanged<AppTab> onToggleKeepAlive;
+
+  @override
+  Widget build(BuildContext context) {
+    return ExpansionTile(
+      tilePadding: EdgeInsets.zero,
+      childrenPadding: EdgeInsets.zero,
+      title: const Text('Advanced controls'),
+      subtitle: Text('Current tab: ${currentTab.name}'),
+      children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilledButton.tonal(
+                onPressed: onPreheatInactive,
+                child: const Text('Preheat inactive tabs'),
+              ),
+              FilledButton.tonal(
+                onPressed: onReleaseInactive,
+                child: const Text('Release inactive tabs'),
+              ),
+              OutlinedButton(
+                onPressed: onForceDisposeInactive,
+                child: const Text('Force dispose inactive tabs'),
+              ),
+              OutlinedButton(
+                onPressed: onSwitchToPlayer,
+                child: const Text('SwitchTo player'),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final tab in AppTab.values)
+                FilterChip(
+                  selected: keepAlive.contains(tab),
+                  onSelected: (_) => onToggleKeepAlive(tab),
+                  label: Text('KeepAlive ${tab.name}'),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+}
+
+class _AnimatedTabPage extends StatefulWidget {
+  const _AnimatedTabPage({
+    required this.tab,
+    required this.accentColor,
+    required this.onTick,
+  });
+
+  final AppTab tab;
+  final Color accentColor;
+  final ValueChanged<int> onTick;
+
+  @override
+  State<_AnimatedTabPage> createState() => _AnimatedTabPageState();
+}
+
+class _AnimatedTabPageState extends State<_AnimatedTabPage>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  int _ticks = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller =
+        AnimationController(
+            vsync: this,
+            duration: const Duration(milliseconds: 900),
+          )
+          ..addListener(() {
+            setState(() => _ticks++);
+            widget.onTick(_ticks);
+          })
+          ..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return ColoredBox(
+          color: widget.accentColor.withValues(alpha: 0.08),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: constraints.maxHeight - 48,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        _iconFor(widget.tab),
+                        color: widget.accentColor,
+                        size: 28,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        widget.tab.name.toUpperCase(),
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Tick count',
+                    style: Theme.of(context).textTheme.labelLarge,
+                  ),
+                  Text(
+                    '$_ticks',
+                    style: Theme.of(context).textTheme.displaySmall,
+                  ),
+                  const SizedBox(height: 20),
+                  AnimatedBuilder(
+                    animation: _controller,
+                    builder: (context, child) {
+                      return Transform.rotate(
+                        angle: _controller.value * 6.28318,
+                        child: child,
+                      );
+                    },
+                    child: Container(
+                      width: 88,
+                      height: 88,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: widget.accentColor, width: 6),
+                        boxShadow: [
+                          BoxShadow(
+                            color: widget.accentColor.withValues(alpha: 0.18),
+                            blurRadius: 18,
+                            spreadRadius: 3,
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Icon(
+                          _iconFor(widget.tab),
+                          color: widget.accentColor,
+                          size: 36,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'How to verify',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '1. Open Flutter DevTools in Profile mode.\n'
+                    '2. Stay on one tab and note the hidden tab counters.\n'
+                    '3. The left stack should stop incrementing hidden tabs.\n'
+                    '4. The right stack should keep incrementing hidden tabs.',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+Color _colorForTab(AppTab tab) {
+  return switch (tab) {
+    AppTab.home => const Color(0xFF2C6E49),
+    AppTab.chart => const Color(0xFFBC6C25),
+    AppTab.player => const Color(0xFF355070),
+  };
+}
+
 IconData _iconFor(AppTab tab) {
-  return const {
-    AppTab.home: Icons.home,
-    AppTab.search: Icons.search,
-    AppTab.profile: Icons.person,
-    AppTab.settings: Icons.settings,
-    AppTab.about: Icons.info,
-  }[tab]!;
+  return switch (tab) {
+    AppTab.home => Icons.home,
+    AppTab.chart => Icons.show_chart,
+    AppTab.player => Icons.album,
+  };
 }
